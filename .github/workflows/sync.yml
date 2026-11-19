@@ -1,0 +1,31 @@
+name: sync
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull sources from deployed app
+        run: |
+          set -e
+          BASE=https://lead-radar.spru.run/repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in README.md \
+            lead-radar/src/ai.mjs lead-radar/src/audit.mjs lead-radar/src/avito.mjs lead-radar/src/crm.mjs \
+            lead-radar/src/landing.mjs lead-radar/src/message.mjs lead-radar/src/server.mjs lead-radar/src/twogis.mjs \
+            lead-radar/public/index.html lead-radar/public/app.js lead-radar/public/style.css \
+            lead-radar/package.json \
+            avito-scanner/manifest.json avito-scanner/popup.html avito-scanner/popup.js avito-scanner/popup.css \
+            avito-scanner/content.js avito-scanner/avito-scan-fn.js avito-scanner/README.md; do
+            mkdir -p "$(dirname "$f")"
+            curl -fsSL "$BASE/$f" -o "$f"
+          done
+          git add -A
+          git commit -m "sync: обновление исходников из приложения" || echo "no changes"
+          git push
