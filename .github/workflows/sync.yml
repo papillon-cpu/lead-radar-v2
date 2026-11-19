@@ -18,6 +18,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for f in README.md \
             lead-radar/src/ai.mjs lead-radar/src/audit.mjs lead-radar/src/avito.mjs lead-radar/src/crm.mjs \
+            lead-radar/src/discover.mjs lead-radar/src/egrul.mjs lead-radar/src/yandex.mjs \
             lead-radar/src/landing.mjs lead-radar/src/message.mjs lead-radar/src/server.mjs lead-radar/src/twogis.mjs \
             lead-radar/public/index.html lead-radar/public/app.js lead-radar/public/style.css \
             lead-radar/package.json \
