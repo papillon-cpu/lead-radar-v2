@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Авито-сканер заказов v2",
+  "version": "2.0",
+  "description": "Собирает заказы с Авито, отправляет их в лид-радар v2 (в облаке или локально), получает оценку и черновик ответа. Отклики не отправляет — только сбор.",
+  "permissions": ["activeTab", "scripting", "storage", "notifications"],
+  "host_permissions": [
+    "https://www.avito.ru/*",
+    "https://lead-radar.spru.run/*",
+    "http://127.0.0.1:4000/*",
+    "http://localhost:4000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Авито-сканер v2"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.avito.ru/*"],
+      "js": ["avito-scan-fn.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

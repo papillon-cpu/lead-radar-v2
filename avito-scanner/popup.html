@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Авито-сканер v2</title>
+<link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+<header>
+  <h1>Авито-сканер <em>v2</em></h1>
+  <span id="status" class="muted">Готов</span>
+</header>
+
+<section class="row">
+  <input id="city" value="moscow" placeholder="город латиницей: moscow, spb…" />
+  <button id="openBtn" class="ghost">Заказы</button>
+  <button id="openServicesBtn" class="ghost">Предложения услуг</button>
+</section>
+
+<section class="row">
+  <button id="scanBtn" class="primary">Сканировать страницу</button>
+  <label class="check"><input type="checkbox" id="onlyGood" checked /> только подходящие</label>
+  <label class="check"><input type="checkbox" id="useAI" checked /> ИИ-оценка</label>
+</section>
+
+<section class="row">
+  <label class="grow small muted">Лид-радар</label>
+  <input id="apiBase" placeholder="https://lead-radar.spru.run" />
+  <button id="saveApi" class="ghost">Сохранить</button>
+</section>
+
+<div id="summary" class="muted small">Заказы появятся здесь после сканирования.</div>
+
+<div id="list"></div>
+
+<section class="row bottom">
+  <button id="saveBtn" class="ghost wide">Сохранить заказы в радаре</button>
+  <button id="importBtn" class="primary wide">Импортировать в лид-радар</button>
+</section>
+
+<footer class="muted small">Отклики не отправляются — только сбор и черновики.</footer>
+<script src="popup.js"></script>
+</body>
+</html>
