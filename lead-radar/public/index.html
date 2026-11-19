@@ -3,103 +3,103 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Лид-радар v2</title>
+<title>Лид-радар · рабочий стол</title>
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-<header>
-  <div class="brand"><span class="dot"></span> Лид-радар <em>v2</em></div>
-  <nav>
-    <button class="tab active" data-tab="orders">Заказы Авито</button>
-    <button class="tab" data-tab="leads">Лиды</button>
-    <button class="tab" data-tab="settings">Настройки</button>
-  </nav>
-  <span id="status" class="muted">Загрузка…</span>
+<header class="top">
+  <div>
+    <h1>ЛИД-РАДАР <span class="sep">/</span> РАБОЧИЙ СТОЛ</h1>
+    <p class="sub">Поиск → очередь → клиент</p>
+  </div>
+  <div class="topright">
+    <span id="queueCount" class="chip">0 в очереди</span>
+    <button id="prepareBtn" class="primary">Подготовить до 10</button>
+    <button id="settingsBtn" class="ghost">Настройки</button>
+  </div>
 </header>
 
-<main>
-  <!-- ЗАКАЗЫ -->
-  <section id="orders" class="pane active">
+<main class="desk">
+  <!-- 01 ПОИСК -->
+  <section class="col">
+    <div class="colhead"><span class="num">01</span> / ПОИСК</div>
     <div class="card">
-      <h2>Заказы с Авито</h2>
-      <p class="muted">Расширение «Авито-сканер» присылает сюда найденные заказы. Мы оцениваем их по правилам и, если задан ключ модели, по ИИ. Отклики не отправляются — только черновики.</p>
-      <div class="row">
-        <button class="primary" id="refreshOrders">Обновить заказы</button>
-        <button id="importAll">Импортировать подходящие в лиды</button>
-        <label class="check"><input type="checkbox" id="onlyGood" checked /> только подходящие</label>
-        <label class="check"><input type="checkbox" id="useAI" checked /> ИИ-оценка</label>
+      <h2>Новая подборка</h2>
+      <label>Ниша или услуга
+        <input id="q" placeholder="Например, барбершоп" />
+      </label>
+      <label>Город или регион
+        <input id="city" placeholder="Город — пусто = вся Россия" />
+      </label>
+      <div class="label">ИСТОЧНИКИ ПОИСКА</div>
+      <div class="srcs">
+        <label class="src"><input type="checkbox" name="src" value="yandex" /> Яндекс</label>
+        <label class="src"><input type="checkbox" name="src" value="avito" checked /> Авито</label>
+        <label class="src"><input type="checkbox" name="src" value="egrul" checked /> ЕГИС</label>
       </div>
-      <div id="ordersSummary" class="muted"></div>
+      <button id="searchBtn" class="primary wide">Найти клиентов</button>
+      <div id="searchMsg" class="muted small"></div>
     </div>
-    <div id="ordersList" class="list"></div>
+    <div class="card">
+      <div class="label">Категории бизнеса · можно выбрать для быстрого заполнения</div>
+      <div id="cats" class="chips"></div>
+    </div>
+    <div class="card">
+      <div class="label">ЗАКАЗЫ С АВИТО</div>
+      <div id="ordersBox" class="muted small">Загрузка…</div>
+      <div class="row">
+        <button id="importAvito">Добавить в очередь</button>
+        <button id="refreshOrders">Обновить</button>
+      </div>
+    </div>
   </section>
 
-  <!-- ЛИДЫ -->
-  <section id="leads" class="pane">
+  <!-- 02 ОТБОР -->
+  <section class="col">
+    <div class="colhead"><span class="num">02</span> / ОТБОР</div>
     <div class="card">
-      <h2>Лиды</h2>
-      <div class="row">
-        <input id="leadSearch" placeholder="поиск по названию, нише, городу" />
-        <button id="auditAll">Проверить все сайты</button>
-        <button id="refreshLeads">Обновить</button>
+      <div class="row space">
+        <h2>Очередь клиентов</h2>
+        <label class="check"><input type="checkbox" id="onlyActive" checked /> активные</label>
       </div>
-      <div id="leadsSummary" class="muted"></div>
+      <input id="filter" class="filter" placeholder="Фильтр по названию или городу" />
+      <div id="queue" class="queue"></div>
     </div>
-    <div id="leadsList" class="list"></div>
   </section>
 
-  <!-- НАСТРОЙКИ -->
-  <section id="settings" class="pane">
-    <div class="card">
-      <h2>Кто вы</h2>
-      <div class="grid">
-        <label>Имя<input id="pName" placeholder="Никита" /></label>
-        <label>Услуга<input id="pOffer" placeholder="лендинги и сайты под ключ" /></label>
-        <label>Портфолио<input id="pPortfolio" placeholder="https://…" /></label>
-        <label>Куда писать<input id="pContact" placeholder="@username" /></label>
-      </div>
-      <label class="check"><input type="checkbox" id="pFreePreview" checked /> предлагать бесплатный черновик первого экрана</label>
-    </div>
-
-    <div class="card">
-      <h2>Модель для оценки заказов</h2>
-      <div class="grid">
-        <label>Провайдер
-          <select id="aiProvider">
-            <option value="gigachat">GigaChat (Сбер)</option>
-            <option value="openai">OpenAI (ChatGPT)</option>
-            <option value="openrouter">OpenRouter</option>
-          </select>
-        </label>
-        <label>Модель<input id="aiModel" placeholder="оставьте пустым — будет модель по умолчанию" /></label>
-      </div>
-      <label>Ключ API<input id="aiKey" type="password" placeholder="вставьте ключ" /></label>
-      <div class="row">
-        <button class="primary" id="saveProfile">Сохранить</button>
-        <button id="testAI">Проверить ключ</button>
-      </div>
-      <p class="muted">Ключ хранится в файле профиля на сервере и не показывается в интерфейсе. Без ключа работают обычные правила.</p>
-    </div>
-
-    <div class="card">
-      <h2>Ключ 2ГИС</h2>
-      <label>Ключ<input id="twogisKey" type="password" placeholder="dev.2gis.ru" /></label>
-      <div class="row">
-        <input id="searchQuery" placeholder="например: стоматология" />
-        <input id="searchCity" placeholder="город" />
-        <button id="doSearch">Найти компании</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Ручной импорт лидов</h2>
-      <textarea id="importText" rows="4" placeholder="название; ниша; город; телефон; сайт — по строке на лид"></textarea>
-      <div class="row"><button id="doImport">Импортировать</button></div>
+  <!-- 03 КАРТОЧКА -->
+  <section class="col">
+    <div class="colhead"><span class="num">03</span> / КАРТОЧКА</div>
+    <div id="cardBox" class="card">
+      <h2 class="muted">Клиент не выбран</h2>
+      <p class="muted small">Выберите компанию в очереди слева — здесь появятся проверка сайта, контакты и готовые действия.</p>
     </div>
   </section>
 </main>
 
-<div id="toast" class="toast"></div>
+<!-- настройки -->
+<dialog id="settings">
+  <form method="dialog">
+    <h2>Настройки</h2>
+    <label>Ваше имя<input id="sName" /></label>
+    <label>Оферта<input id="sOffer" /></label>
+    <label>Портфолио<input id="sPortfolio" /></label>
+    <label>Контакт<input id="sContact" /></label>
+    <div class="label">ИИ-провайдер</div>
+    <select id="sProvider"></select>
+    <label>Модель<input id="sModel" placeholder="например openai/gpt-4o-mini" /></label>
+    <label>Ключ ИИ<input id="sAiKey" type="password" placeholder="не показывается" /></label>
+    <label>Ключ Яндекс.Карт<input id="sYandexKey" type="password" placeholder="поиск по организациям" /></label>
+    <label>Ключ 2ГИС<input id="s2gisKey" type="password" placeholder="dev.2gis.ru" /></label>
+    <div class="row">
+      <button value="save" class="primary">Сохранить</button>
+      <button value="test" id="testAi">Проверить ИИ</button>
+      <button value="cancel">Закрыть</button>
+    </div>
+    <div id="settingsMsg" class="muted small"></div>
+  </form>
+</dialog>
+
 <script src="/app.js"></script>
 </body>
 </html>

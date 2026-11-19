@@ -9,6 +9,7 @@ import { STATUSES, STATUS_LABEL, addDays, addLeads, createStore, dueFollowUps, p
 import { buildLanding } from "./landing.mjs";
 import { buildMessages, buildOrderReply, DEFAULT_PROFILE } from "./message.mjs";
 import { search2gis } from "./twogis.mjs";
+import { CATEGORIES, discover } from "./discover.mjs";
 import { analyzeOrder, summarize } from "./avito.mjs";
 import { AI_PROVIDERS, askAI, messageWithAI, parseJSON, scoreOrderWithAI } from "./ai.mjs";
 
@@ -36,6 +37,7 @@ export function createApp({ dataDir = DATA_DIR, audit = auditSite, search = sear
       aiKey: saved.aiKey || envKey,
       aiModel: saved.aiModel || "",
       twogisKey: saved.twogisKey || process.env.TWOGIS_KEY || "",
+      yandexKey: saved.yandexKey || process.env.YANDEX_KEY || "",
     };
   };
   const saveProfile = (p) => {
@@ -58,7 +60,12 @@ export function createApp({ dataDir = DATA_DIR, audit = auditSite, search = sear
   const PATCHABLE = ["name", "niche", "city", "phone", "site", "telegram", "service", "address", "url", "notes", "status", "followUpAt"];
   const touch = (lead) => (lead.updatedAt = new Date().toISOString());
   const find = (leads, id) => leads.find((l) => l.id === id);
-  const publicProfile = (p) => ({ ...p, aiKey: p.aiKey ? "задан" : "", twogisKey: p.twogisKey ? "задан" : "" });
+  const publicProfile = (p) => ({
+    ...p,
+    aiKey: p.aiKey ? "задан" : "",
+    twogisKey: p.twogisKey ? "задан" : "",
+    yandexKey: p.yandexKey ? "задан" : "",
+  });
 
   const aiOpts = (prof) => ({ provider: prof.aiProvider, key: prof.aiKey, model: prof.aiModel, fetchImpl });
 
@@ -74,6 +81,7 @@ export function createApp({ dataDir = DATA_DIR, audit = auditSite, search = sear
         providers: AI_PROVIDERS,
         statuses: STATUSES.map((s) => ({ id: s, label: STATUS_LABEL[s] })),
         due: dueFollowUps(leads).map((l) => l.id),
+        categories: CATEGORIES,
       };
     }
     if (method === "GET" && p === "/api/orders") {
@@ -164,6 +172,7 @@ export function createApp({ dataDir = DATA_DIR, audit = auditSite, search = sear
       if (typeof body.freePreview === "boolean") next.freePreview = body.freePreview;
       if (typeof body.aiKey === "string" && body.aiKey.trim()) next.aiKey = body.aiKey.trim();
       if (typeof body.twogisKey === "string" && body.twogisKey.trim()) next.twogisKey = body.twogisKey.trim();
+      if (typeof body.yandexKey === "string" && body.yandexKey.trim()) next.yandexKey = body.yandexKey.trim();
       saveProfile(next);
       return { ok: true };
     }
@@ -174,6 +183,50 @@ export function createApp({ dataDir = DATA_DIR, audit = auditSite, search = sear
       const raw = await askAI({ ...aiOpts(prof), user: "Ответь одним словом: ok", timeoutMs: 20000 });
       if (!raw) return { httpStatus: 502, error: "Модель не ответила. Проверьте ключ и провайдера." };
       return { ok: true, answer: String(raw).slice(0, 100) };
+    }
+
+    // Поиск по нескольким источникам сразу: Яндекс.Карты, 2ГИС, ЕГРЮЛ.
+    if (method === "POST" && p === "/api/discover") {
+      const prof = loadProfile();
+      const query = String(body.query || "").trim();
+      if (!query) return { httpStatus: 400, error: "Укажите нишу или услугу" };
+      const sources = Array.isArray(body.sources) && body.sources.length ? body.sources : ["egrul"];
+      const res = await discover({
+        query,
+        city: String(body.city || "").trim(),
+        sources,
+        profile: prof,
+        limit: Number(body.limit) || 40,
+        fetchImpl,
+      });
+      const leads = store.load();
+      const add = addLeads(leads, res.items.map((x) => ({ ...x, niche: query, service: query })));
+      store.save(leads);
+      return { ...add, found: res.items.length, errors: res.errors };
+    }
+
+    // Заказы Авито как источник подбора: превращаем в лиды одним запросом.
+    if (method === "POST" && p === "/api/avito/queue") {
+      const prof = loadProfile();
+      const known = loadOrders();
+      const picks = known.filter((o) => o.score > 0);
+      const leads = store.load();
+      const add = addLeads(
+        leads,
+        picks.map((o) => ({
+          name: o.title || "Заказ с Авито",
+          niche: (o.services || []).map((s) => s.label || s).join(", ") || "заказ с Авито",
+          city: o.city || "",
+          source: "Авито",
+          service: (o.services || []).map((s) => s.label || s).join(", "),
+          url: o.url || "",
+          phone: o.phone || "",
+          site: "",
+          notes: o.reason || "",
+        }))
+      );
+      store.save(leads);
+      return { ...add, orders: picks.length };
     }
 
     if (method === "POST" && p === "/api/search") {
@@ -193,6 +246,31 @@ export function createApp({ dataDir = DATA_DIR, audit = auditSite, search = sear
         if (ai?.reply) return { text: ai.reply, ai: true, score: ai.score };
       }
       return { text: rules, ai: false };
+    }
+
+    // «Подготовить до N»: массово проверить сайты и собрать сообщения для первых N лидов очереди.
+    if (method === "POST" && p === "/api/prepare") {
+      const prof = loadProfile();
+      const n = Math.min(Number(body.limit) || 10, 30);
+      const leads = store.load();
+      const todo = leads.filter((l) => !["won", "lost", "skip"].includes(l.status)).slice(0, n);
+      let audited = 0;
+      let drafted = 0;
+      for (const l of todo) {
+        if (!l.audit) {
+          l.audit = await audit(l.site);
+          audited++;
+        }
+        if (!l.messages) {
+          const ai = await messageWithAI(l, l.audit, prof, aiOpts(prof)).catch(() => null);
+          l.messages = ai?.text ? { ...buildMessages(l, l.audit, prof), first: ai.text, ai: true } : buildMessages(l, l.audit, prof);
+          drafted++;
+        }
+        if (l.status === "new") l.status = "audited";
+        touch(l);
+      }
+      store.save(leads);
+      return { prepared: todo.length, audited, drafted };
     }
 
     if (method === "POST" && p === "/api/audit-all") {
@@ -303,6 +381,16 @@ export function createApp({ dataDir = DATA_DIR, audit = auditSite, search = sear
     const asset = path.join(PUBLIC_DIR, path.normalize(url.pathname).replace(/^(\.\.[/\\])+/, ""));
     if (method === "GET" && asset.startsWith(PUBLIC_DIR) && existsSync(asset) && statSync(asset).isFile()) {
       return send(res, 200, readFileSync(asset), MIME[path.extname(asset)] || "application/octet-stream");
+    }
+
+    // Исходники проекта для синхронизации с GitHub (workflow забирает их отсюда).
+    if (method === "GET" && url.pathname.startsWith("/repo/")) {
+      const rel = path.normalize(decodeURIComponent(url.pathname.slice("/repo/".length))).replace(/^(\.\.[/\\])+/, "");
+      const file = path.join(PUBLIC_DIR, "repo", rel);
+      if (file.startsWith(ROOT) && existsSync(file) && statSync(file).isFile()) {
+        return send(res, 200, readFileSync(file), MIME[path.extname(file)] || "application/octet-stream");
+      }
+      return send(res, 404, { error: "Не найдено" });
     }
 
     const preview = url.pathname.match(/^\/preview\/([a-f0-9]{10})\/(.*)$/);
